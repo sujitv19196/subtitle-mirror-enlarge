@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Subtitles" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" />
+    <title>Subtitle Mirror</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Lexend:wght@400;600;800&display=swap"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="status" role="status" data-kind="connecting">
+      <span class="dot" aria-hidden="true"></span><span id="status-text">Connecting…</span>
+    </div>
+
+    <section id="signs" aria-label="On-screen text"></section>
+
+    <main id="stage">
+      <div id="dialogue" aria-live="polite" aria-atomic="true"></div>
+    </main>
+
+    <button id="open-install" type="button" class="fab" aria-label="Add to Home Screen" aria-haspopup="dialog" hidden>
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+        <rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2" />
+        <path d="M12 8.5v7M8.5 12h7" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      </svg>
+    </button>
+
+    <dialog id="install-guide" aria-labelledby="install-title">
+      <form method="dialog" class="install-body">
+        <header>
+          <h2 id="install-title">Add to Home Screen</h2>
+          <button value="close" class="close">Got it</button>
+        </header>
+        <ol class="steps">
+          <li>Tap Safari's <strong>Share</strong> button <span class="share-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12M8 7l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg></span> in the toolbar below. On newer iOS it's inside the <strong>•••</strong> menu.</li>
+          <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+          <li>Open <strong>Subtitles</strong> from your home screen — it runs full screen.</li>
+        </ol>
+        <div class="arrow" aria-hidden="true">↓</div>
+      </form>
+    </dialog>
+
+    <button id="open-settings" type="button" class="fab" aria-label="Display settings" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M4 6h10.2a3 3 0 0 1 5.6 0H20a1 1 0 1 1 0 2h-.2a3 3 0 0 1-5.6 0H4a1 1 0 0 1 0-2Zm13 1a1 1 0 1 0-2 0 1 1 0 0 0 2 0ZM4 16h1.2a3 3 0 0 1 5.6 0H20a1 1 0 1 1 0 2h-9.2a3 3 0 0 1-5.6 0H4a1 1 0 1 1 0-2Zm5 1a1 1 0 1 0-2 0 1 1 0 0 0 2 0Z"
+        />
+      </svg>
+    </button>
+
+    <video id="keepawake" src="./assets/keepawake.mp4" muted playsinline loop preload="auto" aria-hidden="true"></video>
+
+    <dialog id="settings" aria-labelledby="settings-title">
+      <form method="dialog" id="settings-form">
+        <header>
+          <h2 id="settings-title">Display</h2>
+          <button value="close" class="close" aria-label="Close settings">Done</button>
+        </header>
+
+        <p id="install-hint" class="hint" hidden>
+          For full screen on iPhone: tap <strong>Share → Add to Home Screen</strong>, then open it from the icon.
+        </p>
+
+        <div class="preview" aria-hidden="true"><span>The quick brown fox — <i>jumps</i>.</span></div>
+
+        <label class="row">
+          <span>Text size <output id="size-out"></output></span>
+          <input type="range" name="size" min="18" max="160" step="2" />
+        </label>
+
+        <fieldset class="row">
+          <legend>Font</legend>
+          <div class="chips">
+            <label><input type="radio" name="font" value="atkinson" /><span style="font-family: 'Atkinson Hyperlegible'">Hyperlegible</span></label>
+            <label><input type="radio" name="font" value="lexend" /><span style="font-family: Lexend">Lexend</span></label>
+            <label><input type="radio" name="font" value="system" /><span style="font-family: system-ui">System</span></label>
+            <label><input type="radio" name="font" value="serif" /><span style="font-family: Georgia, serif">Serif</span></label>
+            <label><input type="radio" name="font" value="mono" /><span style="font-family: ui-monospace, monospace">Mono</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="row">
+          <legend>Weight</legend>
+          <div class="chips">
+            <label><input type="radio" name="weight" value="400" /><span style="font-weight: 400">Regular</span></label>
+            <label><input type="radio" name="weight" value="700" /><span style="font-weight: 700">Bold</span></label>
+            <label><input type="radio" name="weight" value="800" /><span style="font-weight: 800">Heavy</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="row">
+          <legend>Colors</legend>
+          <div class="chips swatches">
+            <label><input type="radio" name="theme" value="dark" /><span data-swatch="dark">White on black</span></label>
+            <label><input type="radio" name="theme" value="amber" /><span data-swatch="amber">Yellow on black</span></label>
+            <label><input type="radio" name="theme" value="light" /><span data-swatch="light">Black on white</span></label>
+            <label><input type="radio" name="theme" value="cream" /><span data-swatch="cream">Cream</span></label>
+          </div>
+        </fieldset>
+
+        <label class="row">
+          <span>Line spacing <output id="lh-out"></output></span>
+          <input type="range" name="lineHeight" min="1" max="2" step="0.05" />
+        </label>
+
+        <label class="row">
+          <span>Letter spacing <output id="ls-out"></output></span>
+          <input type="range" name="letterSpacing" min="0" max="0.2" step="0.01" />
+        </label>
+
+        <fieldset class="row">
+          <legend>Position</legend>
+          <div class="chips">
+            <label><input type="radio" name="position" value="top" /><span>Top</span></label>
+            <label><input type="radio" name="position" value="center" /><span>Center</span></label>
+            <label><input type="radio" name="position" value="bottom" /><span>Bottom</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="row">
+          <legend>Alignment</legend>
+          <div class="chips">
+            <label><input type="radio" name="align" value="center" /><span>Center</span></label>
+            <label><input type="radio" name="align" value="start" /><span>Left</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="row toggles">
+          <legend>Show</legend>
+          <label class="toggle"><input type="checkbox" name="holdLast" /><span>Keep last line visible (dimmed) until the next one</span></label>
+          <label class="toggle"><input type="checkbox" name="showSigns" /><span>On-screen text / signs</span></label>
+          <label class="toggle"><input type="checkbox" name="showSongs" /><span>Song lyrics (OP/ED)</span></label>
+        </fieldset>
+
+        <div class="row actions">
+          <button type="button" id="reset-settings">Reset to defaults</button>
+        </div>
+
+        <details class="diag">
+          <summary>Connection details</summary>
+          <dl id="diag"></dl>
+        </details>
+      </form>
+    </dialog>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
