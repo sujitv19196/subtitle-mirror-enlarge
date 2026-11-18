@@ -161,3 +161,7 @@ test/
 ```
 
 To add a tuner, write a `Tuner` in `src/server/subtitles/tuners/` and register it in `tuners/index.ts`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

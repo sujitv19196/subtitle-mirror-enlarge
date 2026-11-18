@@ -2,6 +2,7 @@
   "name": "subtitle-mirror",
   "type": "module",
   "private": true,
+  "license": "MIT",
   "bin": {
     "submirror": "src/server/cli.ts"
   },
