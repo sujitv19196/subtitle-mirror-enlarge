@@ -23,7 +23,7 @@ bun install
 ## Usage
 
 ```sh
-bun src/server/cli.ts "<path to video>"
+bun run play "<path to video>"
 ```
 
 1. If the video has more than one subtitle track, the terminal lists them and you type a number.
@@ -35,7 +35,7 @@ Control playback on the computer as usual: the mpv window, keyboard, or media ke
 For anime, use the anime tuner and pick the Japanese audio:
 
 ```sh
-bun src/server/cli.ts "[Group] Show - 01.mkv" --tuner anime -- --alang=jpn
+bun run play "[Group] Show - 01.mkv" --tuner anime -- --alang=jpn
 ```
 
 Anything after `--` is passed straight to mpv.
@@ -107,7 +107,7 @@ For the reliable way, set up HTTPS once:
 ```sh
 brew install mkcert
 mkcert -install
-bun src/server/cli.ts "<video>" --https
+bun run play "<video>" --https
 ```
 
 Then trust the certificate on your iPhone. The terminal prints where the file is.

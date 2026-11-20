@@ -7,7 +7,7 @@
     "submirror": "src/server/cli.ts"
   },
   "scripts": {
-    "start": "bun src/server/cli.ts",
+    "play": "bun src/server/cli.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "build": "bun build --compile --minify src/server/cli.ts --outfile dist/submirror"
