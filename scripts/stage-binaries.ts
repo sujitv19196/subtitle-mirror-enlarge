@@ -104,7 +104,9 @@ async function fetchMpv(t: Target): Promise<string> {
   const out = join(cacheDir, t.mpvAsset.replace(/\.zip$/, ""));
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
-  await sh(["tar", "-xf", zip, "-C", out]);
+  /** Windows' bsdtar reads zips; Git's GNU tar, often earlier on PATH in CI, doesn't. */
+  const tar = process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
+  await sh([tar, "-xf", zip, "-C", out]);
   /** The macOS zip wraps a tarball so symlinks and permissions survive. */
   if (existsSync(join(out, "mpv.tar.gz"))) await sh(["tar", "-xzf", join(out, "mpv.tar.gz"), "-C", out]);
   return out;

@@ -4,23 +4,40 @@ Mirror the subtitles of whatever you're watching on your computer to your phone,
 
 It plays the video in [mpv](https://mpv.io), follows mpv's playback clock, and serves a small web app over your Wi-Fi. The phone keeps its own copy of the clock, so lines appear on time even when Wi-Fi is jittery. Measured latency is a few milliseconds on the same machine (see [Latency](#latency)).
 
-## Requirements
+## Desktop app (Mac and Windows)
 
-- macOS or Windows
+Download from the [latest release](https://github.com/sujitv19196/subtitle-mirror-enlarge/releases/latest):
+
+- **Mac** (Apple Silicon, macOS 15 or later): `SubtitleMirror-mac-arm64.dmg`. Open it and drag Subtitle Mirror into Applications.
+- **Windows** (64-bit): `SubtitleMirror-windows-x64-setup.exe`. If Windows says it "protected your PC", click **More info → Run anyway**.
+
+Everything it needs, including mpv, is built in. Then:
+
+1. Open Subtitle Mirror and drop a video on the window (or click **Choose video…**).
+2. Pick a subtitle track if the video has more than one, and click **Play**.
+3. Scan the QR code with your phone. The video plays on the computer, and the subtitles show on the phone.
+
+On Windows, the first time you play, allow Subtitle Mirror through the firewall on **Private networks**.
+
+## Command line (Linux, or if you prefer a terminal)
+
+### Requirements
+
+- macOS, Windows or Linux
 - [Bun](https://bun.sh) 1.4+
 - mpv: `brew install mpv` on macOS; on Windows `scoop bucket add extras && scoop install mpv`, or a build from [mpv.io](https://mpv.io/installation/) on your `PATH`
 - A phone on the same Wi-Fi network
 
 You don't need to install ffmpeg yourself. It's bundled through npm (`ffmpeg-static`, `@ffprobe-installer/ffprobe`).
 
-## Setup
+### Setup
 
 ```sh
 git clone <this repo> && cd subtitle-mirror-enlarge
 bun install
 ```
 
-## Usage
+### Usage
 
 ```sh
 bun run play "<path to video>"
@@ -40,7 +57,7 @@ bun run play "[Group] Show - 01.mkv" --tuner anime -- --alang=jpn
 
 Anything after `--` is passed straight to mpv.
 
-### Options
+#### Options
 
 | Option | |
 |---|---|
@@ -147,7 +164,8 @@ bun run typecheck
 src/
   shared/           protocol types and clock sync, used by server and phone
   server/
-    cli.ts          entry point
+    cli.ts          command-line entry point
+    session.ts      start/stop mpv + phone server (shared by CLI and app)
     mpv.ts          mpv JSON IPC client
     sync.ts         mpv events → playback state + subtitle track
     server.ts       HTTP + websocket server
@@ -158,10 +176,26 @@ src/
       tuners/       generic, anime (content interpretation)
       discover.ts   find subtitle files for a video
   client/           phone web app
+  app/              desktop app sidecar (stdio protocol)
+app/
+  ui/               desktop window UI
+  src-tauri/        Tauri shell, icons, signing entitlements
+scripts/            stage-binaries.ts: bundle sidecar, mpv, ffmpeg for the app
 test/
 ```
 
 To add a tuner, write a `Tuner` in `src/server/subtitles/tuners/` and register it in `tuners/index.ts`.
+
+### Desktop app
+
+The desktop app is a [Tauri](https://tauri.app) window (`app/`) that runs the same server as a compiled sidecar (`src/app/sidecar.ts`), talking JSON lines over stdio. To run it locally you need [Rust](https://rustup.rs) and Bun 1.4.5+:
+
+```sh
+bun run app:stage   # compile the sidecar; fetch mpv; copy ffmpeg/ffprobe
+bun run app:dev     # or app:build for a .app/.dmg (Mac) or installer (Windows)
+```
+
+Releases: bump `version` in `package.json`, then push a `v<version>` tag. The Release workflow builds, signs and notarizes the installers and opens a draft release. The Mac build needs these repository secrets: `APPLE_CERTIFICATE` (base64 .p12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD` (app-specific password), `APPLE_TEAM_ID`.
 
 ## License
 
