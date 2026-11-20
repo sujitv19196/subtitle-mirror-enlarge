@@ -110,32 +110,41 @@ export async function startSession(opts: SessionOptions): Promise<Session> {
   }
 
   const stats = new LatencyStats();
-
-  // Getters run on first connection, after `engine` is initialized.
-  const web = startServer({
-    port: opts.port,
-    hostname: opts.host,
-    token,
-    tls,
-    stats,
-    getTrack: () => engine.track,
-    getState: () => engine.state,
-  });
-  const engine = new SyncEngine(mpv, {
-    onState(state, discontinuity) {
-      if (discontinuity) stats.discontinuity(state.serverTs);
-      web.broadcast({ type: "state", state });
-    },
-    onTrack(track) {
-      log(track.error ? `subtitles: ${track.error}` : `subtitles: ${track.cues.length} cues (${track.format}, ${opts.tuner.id} tuner) from ${track.path ?? "—"}`);
-      web.broadcast({ type: "track", track });
-    },
-    onSubText(text, ts) {
-      stats.truth(text, ts);
-    },
-  }, { tuner: opts.tuner });
-
-  await engine.start();
+  let web: ReturnType<typeof startServer> | undefined;
+  let engine: SyncEngine;
+  try {
+    // Getters run on first connection, after `engine` is initialized.
+    web = startServer({
+      port: opts.port,
+      hostname: opts.host,
+      token,
+      tls,
+      stats,
+      getTrack: () => engine.track,
+      getState: () => engine.state,
+    });
+    const server = web;
+    engine = new SyncEngine(mpv, {
+      onState(state, discontinuity) {
+        if (discontinuity) stats.discontinuity(state.serverTs);
+        server.broadcast({ type: "state", state });
+      },
+      onTrack(track) {
+        log(track.error ? `subtitles: ${track.error}` : `subtitles: ${track.cues.length} cues (${track.format}, ${opts.tuner.id} tuner) from ${track.path ?? "—"}`);
+        server.broadcast({ type: "track", track });
+      },
+      onSubText(text, ts) {
+        stats.truth(text, ts);
+      },
+    }, { tuner: opts.tuner });
+    await engine.start();
+  } catch (e) {
+    void web?.server.stop(true);
+    mpv.close();
+    mpvProc.kill();
+    throw e;
+  }
+  const server = web;
 
   const statsTimer = setInterval(() => stats.flush(nowMs()), 2000);
   const statsEvery = opts.statsEveryMs ?? 0;
@@ -152,19 +161,19 @@ export async function startSession(opts: SessionOptions): Promise<Session> {
     if (printTimer) clearInterval(printTimer);
     stats.flush(nowMs() + 10_000);
     log(stats.format());
-    web.broadcast({ type: "ended" });
+    server.broadcast({ type: "ended" });
     mpv.close();
     mpvProc.kill();
     // Let "ended" flush, then force-close sockets: a graceful stop() waits on phones that are asleep.
     setTimeout(() => {
-      void web.server.stop(true);
+      void server.server.stop(true);
       resolveEnded();
     }, 100);
   };
   mpv.on("close", stop);
   void mpvProc.exited.then(stop);
 
-  const urlFor = (host: string) => `${tls ? "https" : "http"}://${host}:${web.server.port}/?t=${token}`;
+  const urlFor = (host: string) => `${tls ? "https" : "http"}://${host}:${server.server.port}/?t=${token}`;
   const url = urlFor(mdnsName ?? lan ?? "localhost");
   return { url, lanUrl: mdnsName && lan ? urlFor(lan) : null, tls: !!tls, rootCA, stop, ended };
 }
