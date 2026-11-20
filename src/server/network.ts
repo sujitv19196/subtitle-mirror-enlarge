@@ -41,7 +41,11 @@ function firstInterfaceAddress(): string | null {
  */
 export function localHostName(): string | null {
   if (process.platform !== "darwin") return null;
-  const out = Bun.spawnSync(["scutil", "--get", "LocalHostName"]);
-  const name = out.success ? out.stdout.toString().trim() : hostname().replace(/\.local$/, "");
+  let name = "";
+  try {
+    const out = Bun.spawnSync(["/usr/sbin/scutil", "--get", "LocalHostName"]);
+    if (out.success) name = out.stdout.toString().trim();
+  } catch {}
+  name ||= hostname().replace(/\.local$/, "");
   return name ? `${name}.local` : null;
 }
