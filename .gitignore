@@ -2,3 +2,11 @@ node_modules
 dist
 *.pem
 .DS_Store
+
+# desktop app
+app/dist-ui
+app/src-tauri/target
+app/src-tauri/gen
+app/src-tauri/binaries
+app/src-tauri/resources
+*.bun-build
