@@ -6,9 +6,9 @@ It plays the video in [mpv](https://mpv.io), follows mpv's playback clock, and s
 
 ## Requirements
 
-- macOS (Windows support is planned; the code already handles its named pipes)
+- macOS or Windows
 - [Bun](https://bun.sh) 1.4+
-- mpv: `brew install mpv`
+- mpv: `brew install mpv` on macOS; on Windows `scoop bucket add extras && scoop install mpv`, or a build from [mpv.io](https://mpv.io/installation/) on your `PATH`
 - A phone on the same Wi-Fi network
 
 You don't need to install ffmpeg yourself. It's bundled through npm (`ffmpeg-static`, `@ffprobe-installer/ffprobe`).
@@ -94,7 +94,7 @@ The live text is in an `aria-live` region, so VoiceOver and braille displays rea
 
 ### Full screen on iPhone
 
-iPhone Safari can't make a web page full screen, but a home-screen app can be. Tap the **add** button left of ⚙ for the steps, or do it yourself: **Share → Add to Home Screen**, then open **Subtitles** from your home screen. The link stays the same between runs and across IP changes, so you only add it once. It uses your Mac's `.local` name and a saved access token.
+iPhone Safari can't make a web page full screen, but a home-screen app can be. Tap the **add** button left of ⚙ for the steps, or do it yourself: **Share → Add to Home Screen**, then open **Subtitles** from your home screen. The link stays the same between runs and across IP changes, so you only add it once. On a Mac it uses the computer's `.local` name and a saved access token. On Windows it uses the IP address, so re-add it if your router gives the computer a new one.
 
 On Android, the first tap on the page switches to full screen.
 
@@ -105,7 +105,7 @@ Phones only allow a page to keep the screen awake (the Wake Lock API) over HTTPS
 For the reliable way, set up HTTPS once:
 
 ```sh
-brew install mkcert
+brew install mkcert            # Windows: scoop bucket add extras && scoop install mkcert
 mkcert -install
 bun run play "<video>" --https
 ```
@@ -121,6 +121,7 @@ Switching between HTTP and HTTPS changes the link, so re-add the home-screen app
 ## Troubleshooting
 
 - **The page won't load from the QR code.** Some networks block `.local` names. Use the IP link printed under the QR code instead. Also check the phone is on the same Wi-Fi and not a guest network.
+- **Windows: the phone can't connect at all.** Allow Bun through Windows Defender Firewall when it asks, and make sure the Wi-Fi network is set to *Private*; Windows blocks incoming connections on *Public* networks.
 - **"no text subtitles found"**: the video has no embedded text track and no matching file. Pass one with `--sub`.
 - **The phone dims or locks.** Tap the page once (this starts the keep-awake), use `--https`, or set Auto-Lock to Never while watching. If the phone does lock, the page reconnects and re-syncs when you unlock it.
 - **The text is early or late.** Subtitle timing adjustments made in mpv (`z` / `Z`) carry over to the phone automatically.

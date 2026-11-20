@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { configDir } from "./config.ts";
+import { installHint } from "./install-hint.ts";
 
 export interface TlsFiles {
   cert: string;
@@ -12,7 +13,7 @@ export interface TlsFiles {
 /** Issues (or reuses) an mkcert certificate for the given hosts (IPs or names). */
 export async function ensureLocalCert(hosts: string[]): Promise<TlsFiles> {
   const mkcert = Bun.which("mkcert");
-  if (!mkcert) throw new Error("--https needs mkcert: brew install mkcert && mkcert -install");
+  if (!mkcert) throw new Error(`--https needs mkcert: ${installHint("mkcert")} && mkcert -install`);
 
   const caRoot = (await new Response(Bun.spawn([mkcert, "-CAROOT"], { stdout: "pipe" }).stdout).text()).trim();
   const rootCA = join(caRoot, "rootCA.pem");
