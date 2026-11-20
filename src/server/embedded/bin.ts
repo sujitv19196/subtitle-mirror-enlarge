@@ -1,9 +1,21 @@
-import ffprobeInstaller from "@ffprobe-installer/ffprobe";
-import ffmpegStatic from "ffmpeg-static";
+import { existsSync } from "node:fs";
 import { basename } from "node:path";
 
-export const FFMPEG: string = (ffmpegStatic as unknown as string | null) ?? "ffmpeg";
-export const FFPROBE: string = ffprobeInstaller.path ?? "ffprobe";
+/** Env override (the desktop app's bundled copy), else the npm binary, else PATH. */
+function resolveBin(envVar: string, fromNpm: () => string | null | undefined, fallback: string): string {
+  const fromEnv = process.env[envVar];
+  if (fromEnv) return fromEnv;
+  try {
+    const p = fromNpm();
+    if (p && existsSync(p)) return p;
+  } catch {
+    // Compiled binaries can't load the npm packages' binaries; @ffprobe-installer throws when its file is missing.
+  }
+  return fallback;
+}
+
+export const FFMPEG = resolveBin("SUBMIRROR_FFMPEG", () => require("ffmpeg-static") as string | null, "ffmpeg");
+export const FFPROBE = resolveBin("SUBMIRROR_FFPROBE", () => require("@ffprobe-installer/ffprobe").path as string, "ffprobe");
 
 /** Runs a binary, returning stdout; throws with stderr on non-zero exit. */
 export async function run(bin: string, args: string[]): Promise<string> {
