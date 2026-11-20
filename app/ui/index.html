@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Subtitle Mirror</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <p id="error" class="banner error" role="alert" hidden></p>
+      <p id="notice" class="banner" role="status" hidden></p>
+
+      <section data-screen="drop">
+        <h1>Subtitle Mirror</h1>
+        <p class="lede">Watch on your computer, read the subtitles on your phone.</p>
+        <div id="dropzone" class="dropzone">
+          <p class="drop-title">Drop a video here</p>
+          <p class="muted">or</p>
+          <button id="choose" class="primary">Choose video…</button>
+        </div>
+        <p class="muted small">Your phone needs to be on the same Wi-Fi as this computer.</p>
+      </section>
+
+      <section data-screen="pick" hidden>
+        <h1 id="video-name"></h1>
+        <fieldset id="tracks">
+          <legend>Subtitles</legend>
+          <div id="track-list"></div>
+        </fieldset>
+        <label class="check">
+          <input type="checkbox" id="anime" />
+          <span>Anime mode<span class="muted small"> — shows signs and song lyrics separately from dialogue</span></span>
+        </label>
+        <p id="skipped" class="muted small" hidden></p>
+        <div class="actions">
+          <button id="back">Back</button>
+          <button id="play" class="primary">Play</button>
+        </div>
+      </section>
+
+      <section data-screen="starting" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <p id="progress">Starting…</p>
+      </section>
+
+      <section data-screen="running" hidden>
+        <h1>Scan with your phone</h1>
+        <div id="qr" class="qr" aria-label="QR code for the phone link"></div>
+        <p class="muted small">Or open this on your phone:</p>
+        <p><code id="url" class="url"></code></p>
+        <p id="lan-wrap" class="muted small" hidden>If that doesn't load: <code id="lan-url" class="url"></code></p>
+        <p class="muted small">Control playback in the video window as usual.</p>
+        <div class="actions">
+          <button id="stop" class="danger">Stop</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
