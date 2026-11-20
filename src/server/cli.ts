@@ -1,19 +1,12 @@
 #!/usr/bin/env bun
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import QRCode from "qrcode";
-import { nowMs } from "../shared/clock.ts";
-import { ipcPath, MpvClient } from "./mpv.ts";
+import { IPHONE_CA_STEPS } from "./https.ts";
 import { installHint } from "./install-hint.ts";
-import { lanAddress, localHostName } from "./network.ts";
-import { startServer } from "./server.ts";
-import { loadOrCreateToken } from "./config.ts";
-import { ensureLocalCert, IPHONE_CA_STEPS } from "./https.ts";
-import { extractTrack, isTextTrack, listSubtitleTracks } from "./embedded/index.ts";
 import { describeSource, promptForChoice, type SubtitleSource } from "./pick-subtitle.ts";
-import { LatencyStats } from "./stats.ts";
-import { discoverSubtitles, getTuner, TUNERS } from "./subtitles/index.ts";
-import { SyncEngine } from "./sync.ts";
+import { listSubtitleSources, resolveSubtitle, startSession } from "./session.ts";
+import { getTuner, TUNERS } from "./subtitles/index.ts";
 
 const USAGE = `usage: submirror <video> [options] [-- <extra mpv args>]
 
@@ -68,117 +61,44 @@ const tuner = (() => {
 const subFile = values.sub ?? (await pickSubtitle(video));
 const mpvBin = Bun.which(values.mpv!) ?? fail(`mpv not found ("${values.mpv}"). Install it: ${installHint("mpv")}`);
 
-const token = loadOrCreateToken();
-const lan = await lanAddress();
-const mdnsName = localHostName();
-let tls: { cert: string; key: string } | undefined = values.cert ? { cert: values.cert, key: values.key! } : undefined;
-let rootCA: string | undefined;
-if (values.https && !tls) {
-  const files = await ensureLocalCert([mdnsName, lan ?? "127.0.0.1"].filter((h): h is string => !!h)).catch((e: Error) => fail(e.message));
-  tls = files;
-  rootCA = files.rootCA;
-}
-
-const sock = ipcPath();
-if (process.platform !== "win32" && existsSync(sock)) unlinkSync(sock);
-
-const mpvProc = Bun.spawn(
-  [
-    mpvBin,
-    `--input-ipc-server=${sock}`,
-    "--sub-auto=no",
-    `--sub-file=${subFile}`,
-    "--force-window=immediate",
-    ...mpvExtra,
-    "--",
-    video,
-  ],
-  { stdin: "ignore", stdout: "ignore", stderr: "inherit" },
-);
-
-const mpv = new MpvClient();
-await mpv.connect(sock).catch((e) => fail(e.message));
-
-const stats = new LatencyStats();
-
-// Getters run on first connection, after `engine` is initialized.
-const web = startServer({
+const session = await startSession({
+  video,
+  subFile,
+  tuner,
+  mpvBin,
+  mpvArgs: mpvExtra,
   port: Number(values.port),
-  hostname: values.host!,
-  token,
-  tls,
-  stats,
-  getTrack: () => engine.track,
-  getState: () => engine.state,
-});
-const engine = new SyncEngine(mpv, {
-  onState(state, discontinuity) {
-    if (discontinuity) stats.discontinuity(state.serverTs);
-    web.broadcast({ type: "state", state });
-  },
-  onTrack(track) {
-    const where = track.path ?? "—";
-    console.log(track.error ? `subtitles: ${track.error}` : `subtitles: ${track.cues.length} cues (${track.format}, ${tuner.id} tuner) from ${where}`);
-    web.broadcast({ type: "track", track });
-  },
-  onSubText(text, ts) {
-    stats.truth(text, ts);
-  },
-}, { tuner });
+  host: values.host!,
+  https: values.https,
+  tls: values.cert ? { cert: values.cert, key: values.key! } : undefined,
+  statsEveryMs: Number(values["stats-every"]) * 1000,
+}).catch((e: Error) => fail(e.message));
 
-await engine.start();
-
-const urlFor = (host: string) => `${tls ? "https" : "http"}://${host}:${web.server.port}/?t=${token}`;
-const url = urlFor(mdnsName ?? lan ?? "localhost");
-console.log("\n" + (await QRCode.toString(url, { type: "terminal", errorCorrectionLevel: "L" })));
-console.log(`Open on your phone: ${url}`);
-if (mdnsName && lan) console.log(`If that doesn't load (some networks block .local names): ${urlFor(lan)}`);
-if (rootCA) console.log("\n" + IPHONE_CA_STEPS(rootCA));
-if (!tls) console.log("(HTTP: screen wake lock unavailable; using the video fallback. Run with --https for the real thing.)");
+console.log("\n" + (await QRCode.toString(session.url, { type: "terminal", errorCorrectionLevel: "L" })));
+console.log(`Open on your phone: ${session.url}`);
+if (session.lanUrl) console.log(`If that doesn't load (some networks block .local names): ${session.lanUrl}`);
+if (session.rootCA) console.log("\n" + IPHONE_CA_STEPS(session.rootCA));
+if (!session.tls) console.log("(HTTP: screen wake lock unavailable; using the video fallback. Run with --https for the real thing.)");
 console.log("iPhone full screen: Share → Add to Home Screen, then launch from the icon.");
 
-const statsEvery = Number(values["stats-every"]) * 1000;
-const statsTimer = setInterval(() => stats.flush(nowMs()), 2000);
-const printTimer = statsEvery > 0 ? setInterval(() => (stats.steady.length || stats.transition.length) && console.log(stats.format()), statsEvery) : null;
-
-let shuttingDown = false;
-function shutdown(code: number): void {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  engine.stop();
-  clearInterval(statsTimer);
-  if (printTimer) clearInterval(printTimer);
-  stats.flush(nowMs() + 10_000);
-  console.log("\n" + stats.format());
-  web.broadcast({ type: "ended" });
-  mpv.close();
-  mpvProc.kill();
-  // Let "ended" flush, then force-close sockets: a graceful stop() waits on phones that are asleep.
-  setTimeout(() => {
-    void web.server.stop(true);
-    process.exit(code);
-  }, 100);
-}
-
-mpv.on("close", () => shutdown(0));
-void mpvProc.exited.then(() => shutdown(0));
+let exitCode = 0;
+void session.ended.then(() => process.exit(exitCode));
 /** A second Ctrl+C exits immediately. */
-const onSignal = (code: number) => () => (shuttingDown ? process.exit(code) : shutdown(code));
+let stopping = false;
+const onSignal = (code: number) => () => {
+  if (stopping) process.exit(code);
+  stopping = true;
+  exitCode = code;
+  console.log();
+  session.stop();
+};
 process.on("SIGINT", onSignal(130));
 process.on("SIGTERM", onSignal(143));
 
 async function pickSubtitle(videoPath: string): Promise<string> {
-  const tracks = await listSubtitleTracks(videoPath).catch((e: Error) => {
-    console.warn(`could not read embedded tracks: ${e.message}`);
-    return [];
-  });
-  const imageTracks = tracks.filter((t) => !isTextTrack(t));
-  if (imageTracks.length) console.log(`skipping ${imageTracks.length} image-based embedded track(s) (${imageTracks.map((t) => t.codec).join(", ")})`);
-
-  const sources: SubtitleSource[] = [
-    ...tracks.filter(isTextTrack).map((track) => ({ kind: "embedded" as const, track })),
-    ...discoverSubtitles(videoPath).map((path) => ({ kind: "file" as const, path })),
-  ];
+  const { sources, skippedImage, probeError } = await listSubtitleSources(videoPath);
+  if (probeError) console.warn(`could not read embedded tracks: ${probeError}`);
+  if (skippedImage.length) console.log(`skipping ${skippedImage.length} image-based embedded track(s) (${skippedImage.join(", ")})`);
   if (sources.length === 0) {
     fail(`no text subtitles found in ${videoPath} or next to it (its folder, Subs/, Subs/<video name>/). Pass one with --sub <file>`);
   }
@@ -192,10 +112,8 @@ async function pickSubtitle(videoPath: string): Promise<string> {
     chosen = i === null ? fail("no subtitle chosen") : sources[i]!;
   }
   console.log(`subtitle: ${describeSource(chosen, videoPath)}`);
-  if (chosen.kind === "file") return chosen.path;
-
-  console.log("extracting track (reads the whole file; cached after the first run)…");
-  return extractTrack(videoPath, chosen.track).catch((e: Error) => fail(e.message));
+  if (chosen.kind === "embedded") console.log("extracting track (reads the whole file; cached after the first run)…");
+  return resolveSubtitle(videoPath, chosen).catch((e: Error) => fail(e.message));
 }
 
 function fail(msg: string): never {
