@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MpvClient } from "../src/server/mpv.ts";
+import { ipcPath, MpvClient } from "../src/server/mpv.ts";
 import { SyncEngine } from "../src/server/sync.ts";
 import type { PlaybackState, Track } from "../src/shared/protocol.ts";
 
@@ -79,7 +79,7 @@ afterEach(() => {
 });
 
 async function setup() {
-  const sockPath = join(dir, `mpv-${Math.random().toString(36).slice(2)}.sock`);
+  const sockPath = ipcPath(`test-${Math.random().toString(36).slice(2)}`);
   const fake = new FakeMpv(sockPath);
   const client = new MpvClient();
   await client.connect(sockPath, 2000);

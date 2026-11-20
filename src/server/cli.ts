@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import QRCode from "qrcode";
 import { nowMs } from "../shared/clock.ts";
 import { ipcPath, MpvClient } from "./mpv.ts";
+import { installHint } from "./install-hint.ts";
 import { lanAddress, localHostName } from "./network.ts";
 import { startServer } from "./server.ts";
 import { loadOrCreateToken } from "./config.ts";
@@ -65,10 +66,10 @@ const tuner = (() => {
   }
 })();
 const subFile = values.sub ?? (await pickSubtitle(video));
-const mpvBin = Bun.which(values.mpv!) ?? fail(`mpv not found ("${values.mpv}"). Install it: brew install mpv`);
+const mpvBin = Bun.which(values.mpv!) ?? fail(`mpv not found ("${values.mpv}"). Install it: ${installHint("mpv")}`);
 
 const token = loadOrCreateToken();
-const lan = lanAddress();
+const lan = await lanAddress();
 const mdnsName = localHostName();
 let tls: { cert: string; key: string } | undefined = values.cert ? { cert: values.cert, key: values.key! } : undefined;
 let rootCA: string | undefined;

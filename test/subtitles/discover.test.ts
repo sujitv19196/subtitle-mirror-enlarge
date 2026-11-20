@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { discoverSubtitles, episodeKey } from "../../src/server/subtitles/discover.ts";
 
 const root = mkdtempSync(join(tmpdir(), "submirror-discover-"));
@@ -17,7 +17,8 @@ function tree(files: string[]): string {
   return dir;
 }
 
-const found = (dir: string, video: string) => discoverSubtitles(join(dir, video)).map((p) => relative(dir, p));
+/** Relative paths with "/" so expectations read the same on Windows. */
+const found = (dir: string, video: string) => discoverSubtitles(join(dir, video)).map((p) => relative(dir, p).replaceAll(sep, "/"));
 
 test("name matches, excluding other videos' subs", () => {
   const dir = tree(["Show S01E01.mkv", "Show S01E02.mkv", "Show S01E01.ja.srt", "Show S01E01.en.ass", "Show S01E02.en.srt"]);

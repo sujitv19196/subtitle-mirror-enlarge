@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { describeSource, promptForChoice } from "../src/server/pick-subtitle.ts";
 
@@ -30,7 +31,7 @@ test("q or EOF returns null", async () => {
 });
 
 test("describeSource", () => {
-  expect(describeSource({ kind: "file", path: "/v/Subs/ep.srt" }, "/v/ep.mkv")).toBe("Subs/ep.srt");
+  expect(describeSource({ kind: "file", path: "/v/Subs/ep.srt" }, "/v/ep.mkv")).toBe(join("Subs", "ep.srt"));
   expect(
     describeSource(
       { kind: "embedded", track: { index: 3, codec: "ass", lang: "eng", title: "Signs & Songs", default: false, forced: true } },
