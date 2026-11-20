@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "build": "bun build --compile --minify src/server/cli.ts --outfile dist/submirror",
     "app:ui": "bun build app/ui/index.html --outdir app/dist-ui --minify",
+    "app:stage": "bun scripts/stage-binaries.ts",
     "app:dev": "cd app && tauri dev",
     "app:build": "cd app && tauri build"
   },
