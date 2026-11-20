@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FFMPEG, run } from "../src/server/embedded/bin.ts";
 import { extractTrack, isTextTrack, listSubtitleTracks } from "../src/server/embedded/index.ts";
+import { listSubtitleSources, resolveSubtitle } from "../src/server/session.ts";
 import { FANSUB_ASS } from "./subtitles/fixtures.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "submirror-embedded-"));
@@ -58,4 +59,24 @@ test("image-based tracks are rejected", async () => {
   expect(extractTrack(video, { index: 9, codec: "hdmv_pgs_subtitle", default: false, forced: false }, cache)).rejects.toThrow(
     /image-based/,
   );
+});
+
+test("listSubtitleSources: embedded tracks first, then files next to the video", async () => {
+  const { sources, skippedImage, probeError } = await listSubtitleSources(video);
+  expect(probeError).toBeUndefined();
+  expect(skippedImage).toEqual([]);
+  expect(sources.map((s) => (s.kind === "embedded" ? `#${s.track.index}` : s.path))).toEqual([
+    "#1",
+    "#2",
+    "#3",
+    join(dir, "a.srt"),
+    join(dir, "b.ass"),
+  ]);
+  expect(await resolveSubtitle(video, sources[3]!)).toBe(join(dir, "a.srt"));
+});
+
+test("listSubtitleSources reports an unreadable video instead of throwing", async () => {
+  const { sources, probeError } = await listSubtitleSources(join(dir, "missing.mkv"));
+  expect(probeError).toBeString();
+  expect(sources.every((s) => s.kind === "file")).toBe(true);
 });
