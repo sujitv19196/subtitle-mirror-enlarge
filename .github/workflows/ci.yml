@@ -9,7 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  tests:
+    name: test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -22,3 +23,11 @@ jobs:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
       - run: bun test
+
+  # Branch protection requires a check named "test"; this reports it for the whole matrix.
+  test:
+    needs: tests
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: '[ "${{ needs.tests.result }}" = "success" ]'
