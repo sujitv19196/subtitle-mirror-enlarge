@@ -3,7 +3,7 @@
  * Puts the sidecar, ffmpeg, ffprobe and mpv where `tauri build` expects them, for the host platform.
  * On macOS, set APPLE_SIGNING_IDENTITY to sign the bundled binaries for notarization.
  */
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const MPV_VERSION = "v0.42.0";
@@ -61,6 +61,13 @@ step(`mpv ${MPV_VERSION}`);
 const extracted = await fetchMpv(target);
 if (process.platform === "darwin") {
   cpSync(join(extracted, "mpv.app"), join(resDir, "mpv.app"), { recursive: true, verbatimSymlinks: true });
+  /** mpv's build leaves .gitkeep files in Contents/MacOS, which codesign rejects as unsigned code. */
+  for (const f of new Bun.Glob("**/.gitkeep").scanSync({ cwd: join(resDir, "mpv.app"), dot: true })) rmSync(join(resDir, "mpv.app", f));
+  /** Some files ship read-only, so Tauri can't overwrite its copy of them on the next build. */
+  for (const f of new Bun.Glob("**/*").scanSync({ cwd: join(resDir, "mpv.app") })) {
+    const path = join(resDir, "mpv.app", f);
+    chmodSync(path, statSync(path).mode | 0o200);
+  }
 } else {
   for (const f of ["mpv.exe", "vulkan-1.dll"]) cpSync(join(extracted, f), join(resDir, f));
 }
@@ -69,7 +76,9 @@ step("licenses");
 mkdirSync(join(resDir, "licenses"), { recursive: true });
 cpSync(join(root, "THIRD_PARTY.md"), join(resDir, "licenses/THIRD_PARTY.md"));
 cpSync(join(root, "LICENSE"), join(resDir, "licenses/LICENSE"));
-cpSync(join(root, "node_modules/ffmpeg-static/ffmpeg.LICENSE"), join(resDir, "licenses/ffmpeg.LICENSE"));
+/** ffmpeg-static only ships this next to the macOS/Linux binaries. */
+const ffmpegLicense = join(root, "node_modules/ffmpeg-static/ffmpeg.LICENSE");
+if (existsSync(ffmpegLicense)) cpSync(ffmpegLicense, join(resDir, "licenses/ffmpeg.LICENSE"));
 
 const identity = process.env.APPLE_SIGNING_IDENTITY;
 if (process.platform === "darwin" && identity) {
@@ -119,7 +128,8 @@ async function signMac(identity: string): Promise<void> {
     sh(["codesign", "--force", "--timestamp", "--options", "runtime", ...(withEntitlements ? ["--entitlements", entitlements] : []), "--sign", identity, path]);
 
   const app = join(resDir, "mpv.app/Contents");
-  const dylibs = [...new Bun.Glob("{MacOS/lib,Frameworks}/*.dylib").scanSync({ cwd: app })];
+  const dylibs = ["MacOS/lib/*.dylib", "Frameworks/*.dylib"].flatMap((p) => [...new Bun.Glob(p).scanSync({ cwd: app })]);
+  if (dylibs.length === 0) die("found no mpv dylibs to sign; did the mpv.app layout change?");
   for (const d of dylibs) await sign(join(app, d));
   await sign(join(app, "MacOS/mpv"), true);
   await sign(join(resDir, "mpv.app"), true);
