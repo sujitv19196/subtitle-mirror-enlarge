@@ -4,6 +4,8 @@ export type TunerId = "generic" | "anime";
 
 export type UiMsg =
   | { type: "probe"; video: string }
+  /** Use this subtitle file (no tracks were found); answered with a one-source "sources". */
+  | { type: "useSub"; video: string; path: string }
   | { type: "start"; video: string; sourceId: number; tuner: TunerId }
   | { type: "stop" };
 

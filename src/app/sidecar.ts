@@ -3,7 +3,7 @@
 import { createInterface } from "node:readline";
 import QRCode from "qrcode";
 import { describeSource, type SubtitleSource } from "../server/pick-subtitle.ts";
-import { listSubtitleSources, resolveSubtitle, startSession, type Session } from "../server/session.ts";
+import { listSubtitleSources, resolveSubtitle, startSession, userSubtitle, type Session } from "../server/session.ts";
 import { getTuner } from "../server/subtitles/index.ts";
 import type { SidecarMsg, UiMsg } from "./protocol.ts";
 
@@ -28,6 +28,12 @@ async function handle(msg: UiMsg): Promise<void> {
         sources: sources.map((s, id) => ({ id, label: describeSource(s, msg.video) })),
         skippedImage,
       });
+      return;
+    }
+    case "useSub": {
+      const source = await userSubtitle(msg.path);
+      probed = { video: msg.video, sources: [source] };
+      send({ type: "sources", video: msg.video, sources: [{ id: 0, label: describeSource(source, msg.video) }], skippedImage: [] });
       return;
     }
     case "start": {

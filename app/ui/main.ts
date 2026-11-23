@@ -5,13 +5,13 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Command, type Child } from "@tauri-apps/plugin-shell";
-import type { SidecarMsg, SourceInfo, UiMsg } from "../../src/app/protocol.ts";
+import type { SidecarMsg, SourceInfo, TunerId, UiMsg } from "../../src/app/protocol.ts";
 
 const VIDEO_EXTS = ["mkv", "mp4", "m4v", "mov", "avi", "webm", "wmv", "flv", "ts", "m2ts", "mpg", "mpeg", "ogv"];
 const SUBTITLE_EXTS = ["srt", "ass", "ssa", "vtt"];
 const IS_WINDOWS = navigator.userAgent.includes("Windows");
 
-type Screen = "drop" | "pick" | "starting" | "running";
+type Screen = "drop" | "pick" | "need-sub" | "starting" | "running";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const screens = document.querySelectorAll<HTMLElement>("[data-screen]");
@@ -19,6 +19,10 @@ const screens = document.querySelectorAll<HTMLElement>("[data-screen]");
 let screen: Screen = "drop";
 let video: string | null = null;
 let sources: SourceInfo[] = [];
+/** The subtitles came from a file the user added, not from the video's folder or tracks. */
+let uploaded = false;
+/** Set while a user-added file is being checked; playback starts with this tuner once it parses. */
+let pendingTuner: TunerId | null = null;
 
 function show(next: Screen): void {
   screen = next;
@@ -84,11 +88,13 @@ function onMessage(msg: SidecarMsg): void {
       return;
     case "sources":
       if (msg.video !== video) return;
-      if (msg.sources.length === 0) {
-        banner("error", `No subtitles found in “${fileName(msg.video)}” or next to it. Put an .srt or .ass file with the same name in the same folder.`);
-        return show("drop");
-      }
       sources = msg.sources;
+      if (pendingTuner) {
+        const tuner = pendingTuner;
+        pendingTuner = null;
+        return void play(tuner);
+      }
+      if (sources.length === 0) return showNeedSub(msg.skippedImage);
       return showPick(msg.skippedImage);
     case "progress":
       $("progress").textContent = msg.text;
@@ -111,7 +117,8 @@ function onMessage(msg: SidecarMsg): void {
       return;
     case "error":
       banner("error", msg.message);
-      if (screen === "starting") show("pick");
+      pendingTuner = null;
+      if (screen === "starting") show(uploaded ? "need-sub" : "pick");
       return;
   }
 }
@@ -121,14 +128,39 @@ async function chooseVideo(path: string): Promise<void> {
   banner("error", null);
   banner("notice", null);
   if (SUBTITLE_EXTS.includes(ext(path))) {
-    banner("error", "That's a subtitle file. Drop the video instead; its subtitles are found automatically.");
+    banner("error", "That's a subtitle file. Drop the video first; you can add subtitles after if none are found.");
     return;
   }
   video = path;
+  uploaded = false;
   $("progress").textContent = "Looking for subtitles…";
   show("starting");
   await send({ type: "probe", video: path });
 }
+
+/** Use a subtitle file the user picked, then start playing once it parses. */
+async function chooseSub(path: string): Promise<void> {
+  if (screen !== "need-sub") return;
+  banner("error", null);
+  uploaded = true;
+  pendingTuner = tunerFrom("anime-sub");
+  $("progress").textContent = "Reading subtitles…";
+  show("starting");
+  await send({ type: "useSub", video: video!, path });
+}
+
+function showNeedSub(skippedImage: string[]): void {
+  $("need-sub-video").textContent = fileName(video!);
+  showSkipped($("skipped-sub"), skippedImage);
+  show("need-sub");
+}
+
+function showSkipped(el: HTMLElement, skippedImage: string[]): void {
+  el.hidden = skippedImage.length === 0;
+  el.textContent = `${skippedImage.length} picture-based subtitle track(s) can't be shown on the phone and were left out.`;
+}
+
+const tunerFrom = (checkboxId: string): TunerId => ($<HTMLInputElement>(checkboxId).checked ? "anime" : "generic");
 
 function showPick(skippedImage: string[]): void {
   $("video-name").textContent = fileName(video!);
@@ -149,19 +181,17 @@ function showPick(skippedImage: string[]): void {
     }),
   );
   $("tracks").hidden = sources.length < 2;
-  const skipped = $("skipped");
-  skipped.hidden = skippedImage.length === 0;
-  skipped.textContent = `${skippedImage.length} picture-based subtitle track(s) can't be shown on the phone and were left out.`;
+  showSkipped($("skipped"), skippedImage);
   show("pick");
 }
 
-async function play(): Promise<void> {
+async function play(tuner: TunerId): Promise<void> {
   const checked = document.querySelector<HTMLInputElement>('input[name="track"]:checked');
   const sourceId = checked ? Number(checked.value) : sources[0]!.id;
   banner("error", null);
   $("progress").textContent = "Starting…";
   show("starting");
-  await send({ type: "start", video: video!, sourceId, tuner: $<HTMLInputElement>("anime").checked ? "anime" : "generic" });
+  await send({ type: "start", video: video!, sourceId, tuner });
 }
 
 async function stop(): Promise<void> {
@@ -183,22 +213,33 @@ $("choose").addEventListener("click", async () => {
   const path = await open({ multiple: false, directory: false, filters: [{ name: "Video", extensions: VIDEO_EXTS }] });
   if (typeof path === "string") await chooseVideo(path);
 });
+$("choose-sub").addEventListener("click", async () => {
+  const path = await open({ multiple: false, directory: false, filters: [{ name: "Subtitles", extensions: SUBTITLE_EXTS }] });
+  if (typeof path === "string") await chooseSub(path);
+});
 $("back").addEventListener("click", () => show("drop"));
-$("play").addEventListener("click", () => void play());
+$("sub-back").addEventListener("click", () => show("drop"));
+$("play").addEventListener("click", () => void play(tunerFrom("anime")));
 $("stop").addEventListener("click", async () => {
   await stop();
   show("drop");
 });
 
-const dropzone = $("dropzone");
+const dropzones = { drop: $("dropzone"), "need-sub": $("sub-dropzone") };
 await getCurrentWebview().onDragDropEvent((e) => {
   const p = e.payload;
-  if (p.type === "enter" || p.type === "over") dropzone.classList.toggle("over", screen === "drop");
-  else if (p.type === "leave") dropzone.classList.remove("over");
-  else if (p.type === "drop") {
-    dropzone.classList.remove("over");
-    const first = p.paths.find((path) => VIDEO_EXTS.includes(ext(path))) ?? p.paths[0];
-    if (first) void chooseVideo(first);
+  if (p.type === "enter" || p.type === "over") {
+    for (const [s, el] of Object.entries(dropzones)) el.classList.toggle("over", screen === s);
+  } else {
+    for (const el of Object.values(dropzones)) el.classList.remove("over");
+    if (p.type !== "drop") return;
+    if (screen === "need-sub") {
+      const first = p.paths.find((path) => SUBTITLE_EXTS.includes(ext(path))) ?? p.paths[0];
+      if (first) void chooseSub(first);
+    } else {
+      const first = p.paths.find((path) => VIDEO_EXTS.includes(ext(path))) ?? p.paths[0];
+      if (first) void chooseVideo(first);
+    }
   }
 });
 

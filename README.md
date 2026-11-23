@@ -14,7 +14,7 @@ Download from the [latest release](https://github.com/sujitv19196/subtitle-mirro
 Everything it needs, including mpv, is built in. Then:
 
 1. Open Subtitle Mirror and drop a video on the window (or click **Choose video…**).
-2. Pick a subtitle track if the video has more than one, and click **Play**.
+2. Pick a subtitle track if the video has more than one, and click **Play**. If it has none, drop or choose a subtitle file (`.srt`, `.ass`, `.ssa`, `.vtt`) and it starts playing once the file is read.
 3. Scan the QR code with your phone. The video plays on the computer, and the subtitles show on the phone.
 
 On Windows, the first time you play, allow Subtitle Mirror through the firewall on **Private networks**.

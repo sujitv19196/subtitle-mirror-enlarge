@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 import { IPHONE_CA_STEPS } from "./https.ts";
 import { installHint } from "./install-hint.ts";
 import { describeSource, promptForChoice, type SubtitleSource } from "./pick-subtitle.ts";
-import { listSubtitleSources, resolveSubtitle, startSession } from "./session.ts";
+import { listSubtitleSources, resolveSubtitle, startSession, userSubtitle } from "./session.ts";
 import { getTuner, TUNERS } from "./subtitles/index.ts";
 
 const USAGE = `usage: submirror <video> [options] [-- <extra mpv args>]
@@ -49,7 +49,6 @@ if (values.help || !video) {
   process.exit(values.help ? 0 : 1);
 }
 if (!existsSync(video)) fail(`video not found: ${video}`);
-if (values.sub && !existsSync(values.sub)) fail(`subtitle file not found: ${values.sub}`);
 if (!!values.cert !== !!values.key) fail("--cert and --key must be given together");
 const tuner = (() => {
   try {
@@ -58,7 +57,9 @@ const tuner = (() => {
     return fail((e as Error).message);
   }
 })();
-const subFile = values.sub ?? (await pickSubtitle(video));
+const subFile = values.sub
+  ? (await userSubtitle(values.sub).catch((e: Error) => fail(e.message))).path
+  : await pickSubtitle(video);
 const mpvBin = Bun.which(values.mpv!) ?? fail(`mpv not found ("${values.mpv}"). Install it: ${installHint("mpv")}`);
 
 const session = await startSession({

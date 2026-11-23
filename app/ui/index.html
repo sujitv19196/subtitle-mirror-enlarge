@@ -39,6 +39,24 @@
         </div>
       </section>
 
+      <section data-screen="need-sub" hidden>
+        <h1 id="need-sub-video"></h1>
+        <p class="lede">No subtitles found in this video or next to it. Add a subtitle file to use with it.</p>
+        <div id="sub-dropzone" class="dropzone">
+          <p class="drop-title">Drop a subtitle file here</p>
+          <p class="muted">.srt, .ass, .ssa or .vtt</p>
+          <button id="choose-sub" class="primary">Choose subtitles…</button>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="anime-sub" />
+          <span>Anime mode<span class="muted small"> — shows signs and song lyrics separately from dialogue</span></span>
+        </label>
+        <p id="skipped-sub" class="muted small" hidden></p>
+        <div class="actions">
+          <button id="sub-back">Back</button>
+        </div>
+      </section>
+
       <section data-screen="starting" hidden>
         <div class="spinner" aria-hidden="true"></div>
         <p id="progress">Starting…</p>

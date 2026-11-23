@@ -51,3 +51,27 @@ test("probe lists subtitle files next to the video", async () => {
   sc.proc.stdin.end();
   expect(await sc.proc.exited).toBe(0);
 });
+
+test("useSub accepts a parseable file and rejects one that isn't", async () => {
+  const video = join(dir, "No Subs.mkv");
+  writeFileSync(video, "not really a video");
+  const good = join(dir, "elsewhere.srt");
+  writeFileSync(good, "1\n00:00:01,000 --> 00:00:02,000\nhi\n");
+  const bad = join(dir, "notes.txt");
+  writeFileSync(bad, "just some text");
+
+  const sc = spawnSidecar();
+  expect(await sc.next()).toEqual({ type: "ready" });
+
+  sc.send({ type: "useSub", video, path: bad });
+  expect(await sc.next()).toMatchObject({ type: "error", message: expect.stringContaining("Unrecognized subtitle format") });
+
+  sc.send({ type: "useSub", video, path: join(dir, "missing.srt") });
+  expect(await sc.next()).toMatchObject({ type: "error", message: expect.stringContaining("not found") });
+
+  sc.send({ type: "useSub", video, path: good });
+  expect(await sc.next()).toEqual({ type: "sources", video, sources: [{ id: 0, label: "elsewhere.srt" }], skippedImage: [] });
+
+  sc.proc.stdin.end();
+  expect(await sc.proc.exited).toBe(0);
+});

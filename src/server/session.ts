@@ -8,7 +8,7 @@ import { lanAddress, localHostName } from "./network.ts";
 import type { SubtitleSource } from "./pick-subtitle.ts";
 import { startServer } from "./server.ts";
 import { LatencyStats } from "./stats.ts";
-import { discoverSubtitles, type Tuner } from "./subtitles/index.ts";
+import { discoverSubtitles, loadSubtitles, type Tuner } from "./subtitles/index.ts";
 import { SyncEngine } from "./sync.ts";
 
 export interface SubtitleSources {
@@ -34,6 +34,14 @@ export async function listSubtitleSources(video: string): Promise<SubtitleSource
     skippedImage: tracks.filter((t) => !isTextTrack(t)).map((t) => t.codec),
     probeError,
   };
+}
+
+/** A subtitle file the user named (CLI --sub, app upload): must exist and parse to at least one line. */
+export async function userSubtitle(path: string): Promise<Extract<SubtitleSource, { kind: "file" }>> {
+  if (!existsSync(path)) throw new Error(`subtitle file not found: ${path}`);
+  const { cues } = await loadSubtitles(path);
+  if (cues.length === 0) throw new Error(`no subtitle lines found in ${path}`);
+  return { kind: "file", path };
 }
 
 /** Path mpv can load: the file itself, or the embedded track extracted (and cached). */
